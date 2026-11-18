@@ -1,0 +1,30 @@
+{
+    "baja_media_alta": {
+        "Buen estado": 0.0,
+        "En mal estado": 0.1
+    },
+    "manzana_baja_media_alta": {
+        "Buen estado": 0.34390000000000004,
+        "Podrido": 0.0
+    },
+    "zanahoria_alta_media_baja": {
+        "Buen estado": 0.19,
+        "Podrido": -0.1
+    },
+    "manzana_alta_alta_baja": {
+        "Buen estado": 0.271,
+        "Podrido": -0.1
+    },
+    "banana_alta_media_baja": {
+        "Buen estado": 0.271,
+        "Podrido": -0.010000000000000009
+    },
+    "manzana_alta_alta_media": {
+        "Buen estado": 0.0,
+        "Podrido": 0.0
+    },
+    "naranja_media_media_media": {
+        "Buen estado": 0.0,
+        "Podrido": 0.1
+    }
+}
