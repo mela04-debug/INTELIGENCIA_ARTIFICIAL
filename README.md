@@ -1,69 +1,19 @@
-Proyecto: Detección de Alimentos en Mal Estado y Alerta de Vencimiento
-1. Descripción del proyecto
+# Proyecto: Detección de Alimentos en Mal Estado y Alerta de Vencimiento
 
-Este proyecto de Inteligencia Artificial tiene como objetivo detectar alimentos en buen estado o en mal estado mediante técnicas de visión por computadora, reconocimiento de imágenes y aprendizaje por refuerzo.
+Proyecto de Inteligencia Artificial que utiliza visión por computadora, reconocimiento de imágenes y aprendizaje por refuerzo para trabajar con alimentos y registrar correcciones realizadas por el usuario.
 
-El sistema permite seleccionar imágenes de frutas y verduras, identificar el alimento mediante un modelo de inteligencia artificial y analizar sus características visuales para determinar su estado.
+## 1. Requisitos previos
 
-Además, incorpora un agente de aprendizaje por refuerzo basado en Q-Learning, que registra las correcciones realizadas por el usuario para actualizar sus decisiones.
+Antes de ejecutar el proyecto, se necesita:
 
-2. Objetivos del proyecto
-Reconocer frutas y verduras mediante imágenes.
-Identificar características visuales de los alimentos.
-Determinar si un alimento se encuentra en buen estado o podrido.
-Estimar la vida útil de los alimentos.
-Permitir que el usuario confirme o corrija los resultados.
-Implementar aprendizaje por refuerzo mediante Q-Learning.
-Guardar los conocimientos aprendidos para futuras ejecuciones.
-3. Tecnologías utilizadas
-Python: lenguaje principal de programación.
-PyTorch: framework de aprendizaje profundo.
-Torchvision: procesamiento y transformación de imágenes.
-timm: biblioteca para utilizar modelos preentrenados.
-MobileNetV3 Small: modelo de reconocimiento de alimentos.
-OpenCV: procesamiento de imágenes.
-NumPy: operaciones y cálculos numéricos.
-Pillow: carga y manipulación de imágenes.
-Hugging Face Hub: descarga del modelo preentrenado.
-Tkinter: desarrollo de la interfaz gráfica.
-4. Algoritmos y agentes utilizados
-4.1. Reconocimiento de alimentos
+- Windows 10 o Windows 11.
+- Python 3.14.
+- Visual Studio Code.
+- Conexión a Internet para instalar las dependencias y descargar el modelo preentrenado.
 
-Se utiliza MobileNetV3 Small, un modelo de visión artificial preentrenado para reconocer 30 categorías de frutas y verduras.
+## 2. Estructura del proyecto
 
-El modelo se obtiene desde Hugging Face mediante la biblioteca timm.
-
-4.2. Procesamiento de imágenes
-
-Se utilizan OpenCV y NumPy para analizar características visuales de los alimentos, como:
-
-Intensidad de los píxeles.
-Variaciones de color.
-Proporción de píxeles oscuros.
-Características visuales relacionadas con el deterioro.
-4.3. Agente de aprendizaje por refuerzo
-
-Se implementa un agente basado en Q-Learning.
-
-El agente contempla dos acciones principales:
-
-Buen estado.
-Podrido.
-
-El usuario puede confirmar o corregir el diagnóstico generado por el sistema.
-
-Las correcciones permiten actualizar los valores de la tabla Q, que se almacena en el archivo:
-
-models/q_table.json
-
-4.4. Estimación de vida útil
-
-El proyecto incorpora un módulo de estimación de vida útil de los alimentos, que permite calcular una aproximación del tiempo restante según los criterios implementados.
-
-Esta estimación es orientativa y no garantiza que un alimento sea seguro para consumir.
-
-5. Estructura del proyecto
-text
+```text
 Proyecto-Deteccion-Alimentos/
 │
 ├── models/
@@ -72,12 +22,9 @@ Proyecto-Deteccion-Alimentos/
 ├── src/
 │   ├── agente/
 │   │   └── q_learning.py
-│   │
 │   ├── estimacion/
 │   │   └── vida_util.py
-│   │
 │   ├── utils/
-│   │
 │   └── vision/
 │       ├── procesamiento.py
 │       └── reconocimiento.py
@@ -98,126 +45,169 @@ Proyecto-Deteccion-Alimentos/
 ├── main.py
 ├── requirements.txt
 └── README.md
+```
 
-6. Requisitos previos
+## 3. Tecnologías y herramientas utilizadas
 
-Para ejecutar el proyecto se necesita:
+- **Python:** lenguaje de programación.
+- **PyTorch:** framework de aprendizaje profundo.
+- **Torchvision:** herramientas para trabajar con imágenes.
+- **timm:** biblioteca para utilizar modelos de visión artificial.
+- **MobileNetV3 Small:** modelo preentrenado para reconocer 30 categorías de frutas y verduras.
+- **OpenCV:** procesamiento de imágenes.
+- **NumPy:** cálculos y extracción de características.
+- **Pillow:** carga y transformación de imágenes.
+- **Hugging Face Hub:** descarga del modelo preentrenado.
+- **Tkinter:** desarrollo de la interfaz gráfica.
 
-Windows 10 o Windows 11.
-Python compatible con las versiones de PyTorch y torchvision utilizadas.
-Visual Studio Code.
-Conexión a Internet para instalar las dependencias y descargar el modelo preentrenado.
+## 4. Agentes y algoritmos utilizados
 
-Se recomienda utilizar Python 3.12 si se presentan problemas de compatibilidad con Python 3.14.
+### 4.1. Reconocimiento de alimentos
 
-7. Instalación del proyecto
-Paso 1. Descargar el proyecto
+Se utiliza MobileNetV3 Small, un modelo preentrenado que permite identificar 30 categorías de alimentos a partir de imágenes.
 
-Descargar el archivo ZIP y extraer la carpeta Proyecto-Deteccion-Alimentos en el equipo.
+El modelo se obtiene desde Hugging Face mediante la biblioteca timm.
 
-Paso 2. Abrir el proyecto
+### 4.2. Procesamiento de imágenes
+
+Se utiliza OpenCV y NumPy para analizar características visuales de las imágenes, como intensidad, variación y proporción de píxeles oscuros.
+
+### 4.3. Agente de aprendizaje por refuerzo
+
+Se implementa Q-Learning para actualizar los valores de las acciones según las respuestas del usuario.
+
+El sistema contempla dos acciones:
+
+- Buen estado.
+- Podrido.
+
+El usuario puede confirmar o corregir el diagnóstico. Los valores aprendidos se almacenan en `models/q_table.json`.
+
+## 5. Instalación del proyecto
+
+### Paso 1. Descargar y descomprimir
+
+Descargar el archivo ZIP del proyecto y extraer la carpeta `Proyecto-Deteccion-Alimentos` en el equipo.
+
+### Paso 2. Abrir en Visual Studio Code
 
 Abrir Visual Studio Code y seleccionar:
 
-Archivo → Abrir carpeta → Proyecto-Deteccion-Alimentos.
+**Archivo → Abrir carpeta → Proyecto-Deteccion-Alimentos**
 
-Paso 3. Abrir la terminal
+### Paso 3. Abrir la terminal
 
-Seleccionar:
+En Visual Studio Code, seleccionar:
 
-Terminal → Nuevo terminal.
+**Terminal → Nuevo terminal**
 
-Verificar que la terminal se encuentre en la carpeta principal del proyecto.
+Verificar que la terminal esté ubicada en la carpeta principal del proyecto.
 
-Paso 4. Crear el entorno virtual
+### Paso 4. Crear el entorno virtual
 
 Ejecutar:
 
-bash
+```bash
 python -m venv .venv
+```
 
-Paso 5. Activar el entorno virtual
+### Paso 5. Activar el entorno virtual
 
-Para PowerShell:
+Si la terminal es PowerShell:
 
-powershell
+```powershell
 .\.venv\Scripts\Activate.ps1
+```
 
+Si la terminal es CMD:
 
-Para CMD:
-
-cmd
+```cmd
 .venv\Scripts\activate.bat
+```
 
-Paso 6. Actualizar pip
-bash
+Cuando esté activado, aparecerá `(.venv)` al inicio de la terminal.
+
+### Paso 6. Actualizar pip
+
+```bash
 python -m pip install --upgrade pip
+```
 
-Paso 7. Instalar las dependencias
-bash
+### Paso 7. Instalar las dependencias
+
+```bash
 python -m pip install -r requirements.txt
+```
 
-Paso 8. Comprobar las instalaciones
-bash
+Este comando instala las librerías necesarias para ejecutar el proyecto.
+
+### Paso 8. Comprobar las instalaciones
+
+```bash
 python -c "import cv2, numpy, torch, torchvision, timm; from PIL import Image; import huggingface_hub; print('Todas las librerías están instaladas correctamente')"
+```
 
-8. Descarga del modelo preentrenado
+Si aparece el mensaje de confirmación, las dependencias principales están disponibles.
 
-El modelo MobileNetV3 Small se descarga automáticamente desde Hugging Face cuando se utiliza por primera vez, siempre que el código de reconocimiento esté configurado para realizar dicha descarga.
+## 6. Descarga del modelo preentrenado
 
-No es necesario descargarlo manualmente si el programa ya realiza este proceso.
+El modelo MobileNetV3 Small se descarga automáticamente desde Hugging Face cuando se utiliza por primera vez.
 
-Se necesita conexión a Internet durante la primera descarga.
+No es necesario descargarlo manualmente ni incluirlo en el archivo ZIP.
 
-En las siguientes ejecuciones se utilizará la copia almacenada en la caché local, siempre que esté disponible.
+**Importante:** se necesita conexión a Internet durante la primera descarga. En las siguientes ejecuciones se utilizará la copia almacenada en la caché local, siempre que siga disponible.
 
-9. Ejecución del proyecto
+## 7. Ejecución del proyecto
 
-Una vez instalado todo y activado el entorno virtual, ejecutar:
+Con el entorno virtual activado, ejecutar:
 
-bash
+```bash
 python interfaz/app.py
-
+```
 
 Se abrirá la interfaz gráfica del sistema.
 
-Desde ella se podrá:
+Desde ella se puede seleccionar una imagen, reconocer el alimento, obtener un diagnóstico y confirmar o corregir el resultado.
 
-Seleccionar una imagen de una fruta o verdura.
-Identificar el alimento mediante el modelo de reconocimiento.
-Analizar sus características visuales.
-Obtener un diagnóstico sobre su estado.
-Confirmar o corregir el resultado.
-Registrar la corrección en el agente Q-Learning.
-10. Ejecución de las pruebas
+## 8. Ejecución de las pruebas
 
 Las pruebas se pueden ejecutar individualmente desde la terminal.
 
-Prueba 1. Procesamiento de imágenes
-bash
+### Prueba 1. Procesamiento de imágenes
+
+```bash
 python pruebas/probar_vision.py
+```
 
-Prueba 2. Agente Q-Learning
-bash
+### Prueba 2. Agente Q-Learning
+
+```bash
 python pruebas/probar_agente.py
+```
 
-Prueba 3. Estimación de vida útil
-bash
+### Prueba 3. Estimación de vida útil
+
+```bash
 python pruebas/probar_vida_util.py
+```
 
-Prueba 4. Reconocimiento de alimentos
-bash
+### Prueba 4. Reconocimiento de alimentos
+
+```bash
 python pruebas/probar_reconocimiento.py
+```
 
-Prueba 5. Integración de componentes
-bash
+### Prueba 5. Integración de componentes
+
+```bash
 python pruebas/probar_integracion.py
+```
 
-11. Archivo requirements.txt
+## 9. Archivo requirements.txt
 
-El proyecto utiliza las siguientes dependencias:
+El archivo contiene las dependencias necesarias:
 
-text
+```text
 numpy
 opencv-python
 Pillow
@@ -225,18 +215,4 @@ torch
 torchvision
 timm
 huggingface_hub
-
-12. Consideraciones importantes
-Es necesario mantener activado el entorno virtual para ejecutar el proyecto con sus dependencias.
-La primera ejecución puede tardar debido a la descarga del modelo preentrenado.
-El archivo models/q_table.json almacena los valores aprendidos por el agente.
-Las correcciones del usuario pueden modificar el comportamiento del agente según la implementación de Q-Learning.
-El reconocimiento visual no garantiza que un alimento sea seguro para consumir.
-La estimación de vida útil es aproximada y no sustituye las recomendaciones de seguridad alimentaria.
-13. Conclusión
-
-El proyecto integra técnicas de Inteligencia Artificial, visión por computadora y aprendizaje por refuerzo para desarrollar un sistema capaz de reconocer alimentos, analizar su estado y registrar correcciones realizadas por el usuario.
-
-La combinación de MobileNetV3 Small y Q-Learning permite integrar reconocimiento de imágenes con un mecanismo de aprendizaje basado en la retroalimentación del usuario.
-
-El objetivo es desarrollar una herramienta de apoyo para la identificación y evaluación visual de frutas y verduras, contribuyendo a una mejor gestión y aprovechamiento de los alimentos.
+```
