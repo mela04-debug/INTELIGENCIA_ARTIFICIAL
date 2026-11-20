@@ -1,7 +1,1 @@
-numpy
-opencv-python
-Pillow
-torch
-torchvision
-timm
-huggingface_hub
+opencv-python\nnumpy\n

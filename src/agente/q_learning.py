@@ -1,159 +1,75 @@
-
 import json
-import random
+import os
 from pathlib import Path
 
-
 class AgenteQLearning:
+    def __init__(self, archivo_qtable="q_table.json"):
+        ruta_base = Path(__file__).resolve().parents[2]
+        self.archivo_qtable = os.path.join(ruta_base, archivo_qtable)
+        
+        self.tasa_aprendizaje = 0.2
+        self.acciones = ["Buen estado", "Mal estado"]
+        
+        self.q_table = self.cargar_qtable()
 
-    ACCIONES = ["Buen estado", "Podrido"]
+    def cargar_qtable(self):
+        if os.path.exists(self.archivo_qtable):
+            try:
+                with open(self.archivo_qtable, 'r', encoding='utf-8') as f:
+                    datos = json.load(f)
+                    # Aseguramos que exista la sección de nombres aprendidos
+                    if "_nombres_aprendidos" not in datos:
+                        datos["_nombres_aprendidos"] = {}
+                    return datos
+            except:
+                return {"_nombres_aprendidos": {}}
+        return {"_nombres_aprendidos": {}}
 
-    def __init__(self, alpha=0.1, epsilon=0.05):
-        self.alpha = alpha
-        self.epsilon = epsilon
+    def guardar_qtable(self):
+        with open(self.archivo_qtable, 'w', encoding='utf-8') as f:
+            json.dump(self.q_table, f, indent=4, ensure_ascii=False)
 
-        proyecto = Path(__file__).resolve().parents[2]
-        self.ruta_tabla = proyecto / "models" / "q_table.json"
+    def predecir(self, estado_visual, alimento_detectado):
+        """
+        1. Revisa si el agente ya aprendió a corregir este alimento bajo este patrón visual.
+        2. Decide si está en Buen o Mal estado según los puntos acumulados.
+        """
+        # --- 1. CORRECCIÓN DE NOMBRE APRENDIDA ---
+        clave_nombre = f"{alimento_detectado.lower()}|{estado_visual}"
+        alimento_final = self.q_table.get("_nombres_aprendidos", {}).get(clave_nombre, alimento_detectado)
 
-        self.q_table = {}
-        self.cargar_tabla()
+        # --- 2. DIAGNÓSTICO SANITARIO (Q-LEARNING) ---
+        if estado_visual not in self.q_table:
+            self.q_table[estado_visual] = {accion: 0.0 for accion in self.acciones}
+            self.guardar_qtable()
 
-    def cargar_tabla(self):
-        if self.ruta_tabla.exists():
-            with open(self.ruta_tabla, "r", encoding="utf-8") as archivo:
-                self.q_table = json.load(archivo)
+        valores = self.q_table[estado_visual]
+        mejor_accion = max(valores, key=valores.get)
+        
+        return estado_visual, mejor_accion, alimento_final
 
-    def guardar_tabla(self):
-        self.ruta_tabla.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(self.ruta_tabla, "w", encoding="utf-8") as archivo:
-            json.dump(
-                self.q_table,
-                archivo,
-                indent=4,
-                ensure_ascii=False
-            )
-
-    def obtener_estado(self, caracteristicas, tipo_alimento="Desconocido"):
-
-        intensidad = caracteristicas["intensidad_media"]
-        variacion = caracteristicas["variacion"]
-        oscuros = caracteristicas["proporcion_oscuros"]
-
-        nivel_intensidad = (
-            "baja" if intensidad < 70
-            else "media" if intensidad < 150
-            else "alta"
-        )
-
-        nivel_variacion = (
-            "baja" if variacion < 30
-            else "media" if variacion < 70
-            else "alta"
-        )
-
-        nivel_oscuros = (
-            "baja" if oscuros < 0.20
-            else "media" if oscuros < 0.50
-            else "alta"
-        )
-
-        alimento = tipo_alimento.lower().replace(" ", "_")
-
-        return (
-            f"{alimento}_{nivel_intensidad}_"
-            f"{nivel_variacion}_{nivel_oscuros}"
-        )
-
-    def predecir(self, caracteristicas, tipo_alimento="Desconocido"):
-
-        estado = self.obtener_estado(
-            caracteristicas,
-            tipo_alimento
-        )
-
-        if estado not in self.q_table:
-            self.q_table[estado] = {
-                accion: 0.0 for accion in self.ACCIONES
-            }
-
-        valores = self.q_table[estado]
-
-        if random.random() < self.epsilon:
-            accion = random.choice(self.ACCIONES)
-        else:
-            mayor_valor = max(valores.values())
-
-            mejores = [
-                accion
-                for accion, valor in valores.items()
-                if valor == mayor_valor
-            ]
-
-            accion = random.choice(mejores)
-
-        return estado, accion
-
-    def actualizar_valor(self, estado, accion, recompensa):
-
-        valor_actual = self.q_table[estado][accion]
-
-        nuevo_valor = valor_actual + self.alpha * (
-            recompensa - valor_actual
-        )
-
-        self.q_table[estado][accion] = nuevo_valor
-
-        return nuevo_valor
-
-    def registrar_feedback(
-        self,
-        estado,
-        accion_predicha,
-        correcto,
-        estado_real=None
-    ):
-
-        if estado not in self.q_table:
-            self.q_table[estado] = {
-                accion: 0.0 for accion in self.ACCIONES
-            }
-
-        if accion_predicha not in self.ACCIONES:
-            raise ValueError("Diagnóstico predicho no válido.")
+    def registrar_feedback(self, estado_visual, accion_tomada, correcto, estado_real=None, alimento_ia=None, alimento_real=None):
+        """
+        Guarda premios/castigos para el estado sanitario y aprende nuevos nombres si fueron corregidos.
+        """
+        if estado_visual not in self.q_table:
+            self.q_table[estado_visual] = {accion: 0.0 for accion in self.acciones}
 
         if correcto:
-            self.actualizar_valor(
-                estado,
-                accion_predicha,
-                recompensa=1
-            )
-
-            recompensa = 1
-
+            recompensa = 10.0
+            self.q_table[estado_visual][accion_tomada] += self.tasa_aprendizaje * (recompensa - self.q_table[estado_visual][accion_tomada])
         else:
-            if estado_real not in self.ACCIONES:
-                raise ValueError(
-                    "Debes indicar el estado real del alimento."
-                )
+            castigo = -10.0
+            recompensa_correcta = 10.0
+            
+            # 1. Castigar estado sanitario equivocado y premiar el real
+            self.q_table[estado_visual][accion_tomada] += self.tasa_aprendizaje * (castigo - self.q_table[estado_visual][accion_tomada])
+            if estado_real in self.q_table[estado_visual]:
+                self.q_table[estado_visual][estado_real] += self.tasa_aprendizaje * (recompensa_correcta - self.q_table[estado_visual][estado_real])
 
-            self.actualizar_valor(
-                estado,
-                accion_predicha,
-                recompensa=-1
-            )
+            # 2. Si el usuario escribió o eligió un nombre diferente, el agente lo memoriza
+            if alimento_ia and alimento_real and alimento_ia.lower().strip() != alimento_real.lower().strip():
+                clave_nombre = f"{alimento_ia.lower().strip()}|{estado_visual}"
+                self.q_table["_nombres_aprendidos"][clave_nombre] = alimento_real.strip().capitalize()
 
-            self.actualizar_valor(
-                estado,
-                estado_real,
-                recompensa=1
-            )
-
-            recompensa = -1
-
-        self.guardar_tabla()
-
-        return {
-            "recompensa": recompensa,
-            "valores": self.q_table[estado].copy()
-        }
+        self.guardar_qtable()

@@ -1,4 +1,3 @@
-
 import torch
 import timm
 
@@ -64,7 +63,8 @@ class ReconocedorAlimentos:
         etiquetas = self.modelo.pretrained_cfg["label_names"]
         self.etiquetas = etiquetas
 
-    def reconocer(self, ruta_imagen, umbral=0.60):
+    # SE REDUJO EL UMBRAL A 0.0 PARA FINES 100% DIDÁCTICOS (NUNCA BLOQUEA IMÁGENES)
+    def reconocer(self, ruta_imagen, umbral=0.0):
 
         ruta = Path(ruta_imagen)
 
@@ -73,34 +73,47 @@ class ReconocedorAlimentos:
                 f"No se encontró la imagen: {ruta}"
             )
 
-        imagen = Image.open(ruta).convert("RGB")
-        imagen_tensor = self.transformar(imagen).unsqueeze(0)
+        try:
+            imagen = Image.open(ruta).convert("RGB")
+            imagen_tensor = self.transformar(imagen).unsqueeze(0)
 
-        with torch.inference_mode():
-            resultados = self.modelo(imagen_tensor)
-            probabilidades = torch.softmax(resultados, dim=1)[0]
+            with torch.inference_mode():
+                resultados = self.modelo(imagen_tensor)
+                probabilidades = torch.softmax(resultados, dim=1)[0]
 
-            confianza, indice = torch.max(
-                probabilidades,
-                dim=0
-            )
+                confianza, indice = torch.max(
+                    probabilidades,
+                    dim=0
+                )
 
-        etiqueta = self.etiquetas[indice.item()]
-        confianza = float(confianza.item())
+            etiqueta = self.etiquetas[indice.item()]
+            confianza = float(confianza.item())
 
-        if confianza < umbral:
+            # Con umbral=0.0, esta condición de bloqueo jamás se activará.
+            # Siempre pasará al return de éxito abajo.
+            if confianza < umbral:
+                return {
+                    "identificado": False,
+                    "alimento": "No identificado",
+                    "categoria": etiqueta,
+                    "confianza": confianza
+                }
+
             return {
-                "identificado": False,
-                "alimento": "No identificado",
+                "identificado": True,
+                "alimento": self.ETIQUETAS_ES.get(
+                    etiqueta, etiqueta
+                ),
                 "categoria": etiqueta,
                 "confianza": confianza
             }
-
-        return {
-            "identificado": True,
-            "alimento": self.ETIQUETAS_ES.get(
-                etiqueta, etiqueta
-            ),
-            "categoria": etiqueta,
-            "confianza": confianza
-        }
+            
+        except Exception as e:
+            print(f"Error procesando la imagen: {e}")
+            # Retorno de seguridad por si ocurre un error grave al leer la foto
+            return {
+                "identificado": True, 
+                "alimento": "Desconocido",
+                "categoria": "unknown",
+                "confianza": 0.0
+            }
