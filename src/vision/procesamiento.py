@@ -58,3 +58,43 @@ def analizar_imagen(ruta_imagen):
         
     # Retornamos el estado abstracto al agente
     return f"{tono}_{manchas}_{textura}"
+
+def obtener_imagenes_procesamiento(ruta_imagen):
+    """
+    Obtiene la imagen original y sus componentes visuales:
+    RGB, canales individuales y escala de grises.
+
+    No interviene en el diagnóstico del agente.
+    """
+    imagen_bgr = cv2.imread(str(ruta_imagen), cv2.IMREAD_COLOR)
+
+    if imagen_bgr is None:
+        raise ValueError(f"No se pudo cargar la imagen: {ruta_imagen}")
+
+    # OpenCV carga las imágenes en formato BGR.
+    # Convertimos a RGB para mantener el orden correcto de los canales.
+    imagen_rgb = cv2.cvtColor(imagen_bgr, cv2.COLOR_BGR2RGB)
+
+    # Extraemos cada canal de color individualmente.
+    canal_r = imagen_rgb[:, :, 0]
+    canal_g = imagen_rgb[:, :, 1]
+    canal_b = imagen_rgb[:, :, 2]
+
+    # Conversión a escala de grises.
+    imagen_gris = cv2.cvtColor(imagen_bgr, cv2.COLOR_BGR2GRAY)
+
+    alto, ancho = imagen_rgb.shape[:2]
+
+    return {
+        "imagen_rgb": imagen_rgb,
+        "canal_r": canal_r,
+        "canal_g": canal_g,
+        "canal_b": canal_b,
+        "imagen_gris": imagen_gris,
+        "ancho": ancho,
+        "alto": alto,
+        "media_r": float(np.mean(canal_r)),
+        "media_g": float(np.mean(canal_g)),
+        "media_b": float(np.mean(canal_b)),
+        "media_gris": float(np.mean(imagen_gris))
+    }
