@@ -9,7 +9,7 @@ PROYECTO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROYECTO))
 
 from src.vision.reconocimiento import ReconocedorAlimentos
-from src.vision.procesamiento import analizar_imagen
+from src.vision.procesamiento import analizar_imagen, obtener_imagenes_procesamiento
 from src.agente.q_learning import AgenteQLearning
 from src.estimacion.vida_util import estimar_vida_util
 
@@ -34,20 +34,20 @@ RANGOS_REFERENCIA = {
 }
 
 COLORES = {
-    "fondo": "#F8FAFC",          
-    "tarjeta": "#FFFFFF",        
-    "borde": "#E2E8F0",          
+    "fondo": "#F8FAFC",
+    "tarjeta": "#FFFFFF",
+    "borde": "#E2E8F0",
     "texto_principal": "#0F172A",
     "texto_secundario": "#64748B",
-    "primario": "#2563EB",       
-    "primario_hover": "#1D4ED8", 
-    "exito_bg": "#DCFCE7",       
-    "exito_fg": "#166534",       
-    "alerta_bg": "#FEF3C7",      
-    "alerta_fg": "#92400E",      
-    "peligro_bg": "#FEE2E2",     
-    "peligro_fg": "#991B1B",     
-    "neutro_bg": "#F1F5F9",      
+    "primario": "#2563EB",
+    "primario_hover": "#1D4ED8",
+    "exito_bg": "#DCFCE7",
+    "exito_fg": "#166534",
+    "alerta_bg": "#FEF3C7",
+    "alerta_fg": "#92400E",
+    "peligro_bg": "#FEE2E2",
+    "peligro_fg": "#991B1B",
+    "neutro_bg": "#F1F5F9",
 }
 
 class AplicacionAlimentos:
@@ -67,7 +67,7 @@ class AplicacionAlimentos:
 
         # Lista inicial dinámica (irá creciendo con los nombres que tú escribas)
         self.opciones_alimentos = [
-            "Manzana", "Plátano", "Naranja", "Tomate", "Frutilla", 
+            "Manzana", "Plátano", "Naranja", "Tomate", "Frutilla",
             "Cebolla", "Limón", "Zanahoria", "Mango", "Piña", "Pera",
             "Espinaca", "Apio", "Perejil", "Lechuga", "Papa"
         ]
@@ -76,7 +76,7 @@ class AplicacionAlimentos:
         self.agente = AgenteQLearning()
 
         self.configurar_estilos()
-        
+
         self.notebook = ttk.Notebook(self.ventana)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -86,10 +86,18 @@ class AplicacionAlimentos:
         self.tab_memoria = tk.Frame(self.notebook, bg=COLORES["fondo"])
         self.notebook.add(self.tab_memoria, text=" 🧠 Cerebro de la IA (Patrones) ")
 
+        self.tab_procesamiento = tk.Frame(self.notebook, bg=COLORES["fondo"])
+        self.notebook.add(self.tab_procesamiento,text="  Procesamiento de imagen  ")
+
         self.configurar_scroll_analisis()
+        self.configurar_scroll_procesamiento()
+
         self.crear_interfaz_analisis()
         self.crear_interfaz_memoria()
+        self.crear_interfaz_procesamiento()
 
+        self.ventana.bind_all("<MouseWheel>", self._desplazar_scroll)
+        self.imagen_tk = None
         self.estado_texto.set("Inicializando modelo neuronal...")
         self.ventana.after(100, self.cargar_modelo)
 
@@ -119,7 +127,38 @@ class AplicacionAlimentos:
 
         self.contenido_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width))
-        self.canvas.bind_all("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+
+    def configurar_scroll_procesamiento(self):
+        self.canvas_procesamiento = tk.Canvas(self.tab_procesamiento, bg=COLORES["fondo"], highlightthickness=0)
+
+        self.scrollbar_procesamiento = ttk.Scrollbar(self.tab_procesamiento, orient="vertical", command=self.canvas_procesamiento.yview)
+        self.canvas_procesamiento.configure(yscrollcommand=self.scrollbar_procesamiento.set)
+        self.scrollbar_procesamiento.pack(side="right", fill="y")
+        self.canvas_procesamiento.pack(side="left", fill="both", expand=True)
+
+        self.contenido_procesamiento = tk.Frame(self.canvas_procesamiento, bg=COLORES["fondo"])
+
+        self.canvas_procesamiento_window = (self.canvas_procesamiento.create_window((0, 0), window=self.contenido_procesamiento, anchor="nw"))
+
+        self.contenido_procesamiento.bind("<Configure>",lambda e: self.canvas_procesamiento.configure(scrollregion=self.canvas_procesamiento.bbox("all")))
+
+        self.canvas_procesamiento.bind("<Configure>", lambda e: self.canvas_procesamiento.itemconfig(self.canvas_procesamiento_window, width=e.width))
+
+    def _desplazar_scroll(self, event):
+        pestaña_actual = self.notebook.select()
+
+        if pestaña_actual == str(self.tab_analisis):
+            canvas = self.canvas
+
+        elif pestaña_actual == str(self.tab_procesamiento):
+            canvas = self.canvas_procesamiento
+
+        else:
+            return
+
+        canvas.yview_scroll(int(-1 * (event.delta / 120)),"units")
+
+        return "break"
 
     def crear_tarjeta(self, parent, pady=(0, 16)):
         card = tk.Frame(parent, bg=COLORES["tarjeta"], highlightbackground=COLORES["borde"], highlightthickness=1, padx=24, pady=18)
@@ -219,7 +258,7 @@ class AplicacionAlimentos:
         tk.Label(header, text="Aquí puedes ver exactamente qué características extrae la IA para aprender.", font=("Segoe UI", 10), fg=COLORES["texto_secundario"], bg=COLORES["fondo"]).pack(anchor="w", pady=(2, 0))
 
         card_info = self.crear_tarjeta(self.tab_memoria, pady=(10, 14))
-        
+
         tk.Label(card_info, text="EL AGENTE NO VE PÍXELES. VE LO SIGUIENTE:", font=("Segoe UI", 9, "bold"), fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"]).pack(anchor="w", pady=(0, 15))
 
         self.patron_var = tk.StringVar(value="Sube una imagen para ver el patrón.")
@@ -229,21 +268,112 @@ class AplicacionAlimentos:
 
         grid_memoria = tk.Frame(card_info, bg=COLORES["tarjeta"])
         grid_memoria.pack(fill="x", pady=5)
-        
+
         self._crear_dato_memoria(grid_memoria, "🎨 Tono de Color:", self.tono_var, 0)
         self._crear_dato_memoria(grid_memoria, "🦠 Nivel de Manchas:", self.manchas_var, 1)
         self._crear_dato_memoria(grid_memoria, "🧊 Tipo de Textura:", self.textura_var, 2)
-        
+
         tk.Frame(card_info, height=1, bg=COLORES["borde"]).pack(fill="x", pady=20)
-        
+
         tk.Label(card_info, text="CÓDIGO DE MEMORIA (El que se guarda en su JSON):", font=("Segoe UI", 9, "bold"), fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"]).pack(anchor="w", pady=(0, 5))
-        
+
         lbl_patron = tk.Label(card_info, textvariable=self.patron_var, font=("Consolas", 11, "bold"), fg=COLORES["exito_fg"], bg=COLORES["exito_bg"], padx=15, pady=10)
         lbl_patron.pack(fill="x", pady=(5, 10))
-        
+
         texto_explicativo = "Al corregir a la IA en la pestaña anterior (incluso si escribes un nombre nuevo), el agente guarda esa asociación en su JSON para aplicarla en futuros análisis."
         msg = tk.Message(card_info, text=texto_explicativo, font=("Segoe UI", 9), fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"], width=600)
         msg.pack(anchor="w")
+
+    def crear_interfaz_procesamiento(self):
+        header = tk.Frame(self.contenido_procesamiento, bg=COLORES["fondo"])
+        header.pack(fill="x", padx=45, pady=(24, 14))
+        tk.Label(header, text="Procesamiento de Imagen", font=("Segoe UI", 22, "bold"), fg=COLORES["texto_principal"], bg=COLORES["fondo"]).pack(anchor="w")
+        tk.Label(header, text="Visualización de la imagen original, sus canales RGB y su conversión a escala de grises.", font=("Segoe UI", 10), fg=COLORES["texto_secundario"], bg=COLORES["fondo"], wraplength=700, justify="left").pack(anchor="w", pady=(2, 0))
+        card = self.crear_tarjeta(self.contenido_procesamiento, pady=(10, 14))
+
+        tk.Label(card, text="VISUALIZACIÓN DE COMPONENTES", font=("Segoe UI", 9, "bold"), fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"]).pack(anchor="w", pady=(0, 12))
+
+        grid = tk.Frame(card, bg=COLORES["tarjeta"])
+        grid.pack(fill="both", expand=True)
+
+        for columna in range(2):
+            grid.columnconfigure(columna, weight=1)
+
+        self.paneles_procesamiento = {}
+        self.imagenes_procesamiento_tk = {}
+
+        componentes = [("original", "Imagen original", 0, 0), ("gris", "Escala de grises", 0, 1), ("r", "Canal R - Rojo", 1, 0), ("g", "Canal G - Verde", 1, 1), ("b", "Canal B - Azul", 2, 0)]
+
+        for clave, titulo, fila, columna in componentes:
+            panel = tk.Frame(grid, bg=COLORES["neutro_bg"], padx=8, pady=8)
+            panel.grid(row=fila, column=columna, sticky="nsew", padx=6, pady=6)
+
+            tk.Label(panel, text=titulo, font=("Segoe UI", 10, "bold"), fg=COLORES["texto_principal"], bg=COLORES["neutro_bg"]).pack(pady=(0, 6))
+
+            imagen_label = tk.Label(panel, text="Selecciona una imagen para visualizar", font=("Segoe UI", 9), fg=COLORES["texto_secundario"], bg=COLORES["neutro_bg"], anchor="center", justify="center")
+            imagen_label.pack(fill="both", expand=True)
+
+            self.paneles_procesamiento[clave] = imagen_label
+
+        card_info = tk.Frame(grid, bg=COLORES["tarjeta"], padx=10, pady=10)
+        card_info.grid(row=2, column=1, sticky="nsew", padx=6, pady=6)
+
+        tk.Label(card_info, text="INFORMACIÓN DE LA IMAGEN", font=("Segoe UI", 9, "bold"), fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"]).pack(anchor="w", pady=(0, 10))
+
+        self.dimension_var = tk.StringVar(value="--")
+        self.media_r_var = tk.StringVar(value="--")
+        self.media_g_var = tk.StringVar(value="--")
+        self.media_b_var = tk.StringVar(value="--")
+        self.media_gris_var = tk.StringVar(value="--")
+
+        datos = [("Dimensiones:", self.dimension_var), ("Media R:", self.media_r_var), ("Media G:", self.media_g_var), ("Media B:", self.media_b_var), ("Media gris:", self.media_gris_var)]
+
+        for etiqueta, variable in datos:
+            fila = tk.Frame(card_info, bg=COLORES["tarjeta"])
+            fila.pack(fill="x", pady=4)
+
+            tk.Label(fila, text=etiqueta, font=("Segoe UI", 9), fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"]).pack(side="left")
+            tk.Label(fila, textvariable=variable, font=("Segoe UI", 9, "bold"), fg=COLORES["texto_principal"], bg=COLORES["tarjeta"]).pack(side="right")
+
+    def actualizar_vista_procesamiento(self):
+        """
+        Obtiene los componentes de la imagen y actualiza los paneles de visualización.
+        """
+        if self.ruta_imagen is None:
+            return
+
+        try:
+            datos = obtener_imagenes_procesamiento(self.ruta_imagen)
+
+            componentes = {
+            "original": datos["imagen_rgb"],
+            "r": datos["canal_r"],
+            "g": datos["canal_g"],
+            "b": datos["canal_b"],
+            "gris": datos["imagen_gris"]
+            }
+
+            for clave, matriz in componentes.items():
+
+                imagen = Image.fromarray(matriz)
+
+                imagen = ImageOps.contain(imagen, (260, 160),method=Image.Resampling.LANCZOS)
+
+                imagen_tk = ImageTk.PhotoImage(imagen)
+
+                self.imagenes_procesamiento_tk[clave] = imagen_tk
+
+                self.paneles_procesamiento[clave].config(image=imagen_tk, text="")
+
+            self.dimension_var.set(f'{datos["ancho"]} x {datos["alto"]} píxeles')
+
+            self.media_r_var.set(f'{datos["media_r"]:.2f}')
+            self.media_g_var.set(f'{datos["media_g"]:.2f}')
+            self.media_b_var.set(f'{datos["media_b"]:.2f}')
+            self.media_gris_var.set(f'{datos["media_gris"]:.2f}')
+
+        except Exception as error:
+            messagebox.showwarning("Procesamiento de imagen", f"No se pudo generar la visualización:\n{error}")
 
     def _crear_dato(self, parent, etiqueta, variable, fila, columna):
         bloque = tk.Frame(parent, bg=COLORES["tarjeta"])
@@ -272,12 +402,24 @@ class AplicacionAlimentos:
         self.limpiar_resultados()
         self.ruta_imagen = Path(ruta)
         self.mostrar_imagen()
+        self.actualizar_vista_procesamiento()
         self.analizar_alimento()
 
     def limpiar_interfaz(self):
         self.ruta_imagen = None
         self.imagen_tk = None
         self.panel_imagen.config(image="", text="Selecciona una fotografía del alimento")
+        self.imagenes_procesamiento_tk.clear()
+
+        for panel in self.paneles_procesamiento.values():
+            panel.config(image="", text="Selecciona una imagen para visualizar")
+
+        self.dimension_var.set("--")
+        self.media_r_var.set("--")
+        self.media_g_var.set("--")
+        self.media_b_var.set("--")
+        self.media_gris_var.set("--")
+
         self.limpiar_resultados()
         self.estado_texto.set("Pantalla limpia. Listo para una nueva imagen.")
 
@@ -297,7 +439,7 @@ class AplicacionAlimentos:
         self.boton_correcto.config(state="disabled")
         self.boton_corregir.config(state="disabled")
         self.correccion_frame.pack_forget()
-        
+
         self.patron_var.set("Sube una imagen para ver el patrón.")
         self.tono_var.set("--")
         self.manchas_var.set("--")
@@ -313,7 +455,7 @@ class AplicacionAlimentos:
         clave = alimento.lower().strip()
         # Si escribiste un alimento nuevo que no está en RANGOS_REFERENCIA, usa (5, 10) días por defecto
         vida_min, vida_max = RANGOS_REFERENCIA.get(clave, (5, 10))
-        
+
         es_malo = diagnostico.lower().strip() == "mal estado"
         estado_visual = "En mal estado" if es_malo else "Buen estado"
 
@@ -330,7 +472,7 @@ class AplicacionAlimentos:
         bg, fg = COLORES["exito_bg"], COLORES["exito_fg"]
         if nivel == "URGENTE": bg, fg = COLORES["peligro_bg"], COLORES["peligro_fg"]
         elif nivel == "PRECAUCIÓN": bg, fg = COLORES["alerta_bg"], COLORES["alerta_fg"]
-        
+
         self.banner_alerta.config(bg=bg)
         self.label_alerta.config(bg=bg, fg=fg)
 
@@ -346,9 +488,9 @@ class AplicacionAlimentos:
 
             alimento_raw = identificacion["alimento"].capitalize()
             self.alimento_ia_original = alimento_raw
-            
+
             caracteristicas = analizar_imagen(str(self.ruta_imagen))
-            
+
             # El agente devuelve el estado sanitario y el nombre (corregido si ya lo aprendió antes)
             estado, diagnostico, alimento_aprendido = self.agente.predecir(caracteristicas, alimento_raw)
 
@@ -360,23 +502,23 @@ class AplicacionAlimentos:
             self.diagnostico_var.set(diagnostico)
 
             self.actualizar_vida_util(alimento_aprendido, diagnostico)
-            
+
             self.patron_var.set(estado)
-            
+
             if "color_muy_oscuro" in estado: tono = "Muy oscuro"
             elif "color_apagado" in estado: tono = "Apagado"
             elif "color_brillante" in estado: tono = "Brillante"
             else: tono = "Desconocido"
-            
+
             if "muchas_manchas" in estado: manchas = "Alto porcentaje de manchas"
             elif "algunas_manchas" in estado: manchas = "Ligeras manchas detectadas"
             elif "sin_manchas" in estado: manchas = "Sin manchas (Limpio)"
             else: manchas = "Desconocido"
-            
+
             if "textura_irregular" in estado: textura = "Irregular o con arrugas"
             elif "textura_lisa" in estado: textura = "Superficie lisa"
             else: textura = "Desconocida"
-            
+
             self.tono_var.set(tono)
             self.manchas_var.set(manchas)
             self.textura_var.set(textura)
