@@ -1,78 +1,48 @@
-
-import sys
-from pathlib import Path
-
-# Identificar la carpeta principal del proyecto
-PROYECTO = Path(__file__).resolve().parent
-sys.path.insert(0, str(PROYECTO))
-
-# Importar los tres módulos
-from src.vision.procesamiento import analizar_imagen
+import os
+from src.vision.procesamiento import extraer_caracteristicas, discretizar_estado
 from src.agente.q_learning import AgenteQLearning
-from src.estimacion.vida_util import estimar_vida_util
 
-
-def ejecutar_analisis():
-
-    print("\n======================================")
-    print(" DETECCIÓN DE ALIMENTOS Y VENCIMIENTO")
-    print("======================================")
-
-    # 1. Seleccionar imagen
-    ruta_imagen = PROYECTO / "datos" / "imagenes_prueba" / "manzana.jpg"
-
-    try:
-        caracteristicas = analizar_imagen(str(ruta_imagen))
-    except (ValueError, OSError) as error:
-        print("\nError al analizar la imagen:", error)
-        return
-
-    print("\n1. ANÁLISIS VISUAL")
-    print("------------------------------")
-    print("Intensidad media:", round(caracteristicas["intensidad_media"], 2))
-    print("Variación:", round(caracteristicas["variacion"], 2))
-    print(
-        "Proporción de píxeles oscuros:",
-        round(caracteristicas["proporcion_oscuros"], 2)
-    )
-
-    # 2. Diagnóstico del agente
+def entrenar_agente_con_imagen(ruta_imagen, estado_real):
     agente = AgenteQLearning()
-    estado, diagnostico = agente.predecir(caracteristicas)
-
-    print("\n2. DIAGNÓSTICO DEL AGENTE")
-    print("------------------------------")
-    print("Estado analizado:", estado)
-    print("Diagnóstico:", diagnostico)
-
-    # 3. Estimación de vida útil
-    resultado = estimar_vida_util(
-        tipo_alimento="Manzana",
-        dias_almacenado=8,
-        vida_util_min=10,
-        vida_util_max=15,
-        estado_visual=diagnostico,
-        almacenamiento="Refrigerado"
-    )
-
-    print("\n3. ESTIMACIÓN DE VIDA ÚTIL")
-    print("------------------------------")
-    print("Alimento:", resultado["alimento"])
-    print("Estado visual:", resultado["estado_visual"])
-    print("Almacenamiento:", resultado["almacenamiento"])
-    print(
-        "Días restantes:",
-        resultado["dias_restantes_min"],
-        "a",
-        resultado["dias_restantes_max"]
-    )
-    print("Nivel de alerta:", resultado["nivel_alerta"])
-    print("Mensaje:", resultado["alerta"])
-
-    print("\n======================================")
-    print(" ANÁLISIS FINALIZADO")
-    print("======================================")
-
+    print(f"\nProcesando imagen: {ruta_imagen}")
+    
+    try:
+        porcentaje, s, v = extraer_caracteristicas(ruta_imagen)
+    except Exception as e:
+        print(f"Error al procesar la imagen: {e}")
+        return
+    
+    estado_actual = discretizar_estado(porcentaje, s, v)
+    print(f"Características detectadas -> Estado: {estado_actual}")
+    
+    accion_predicha = agente.elegir_accion(estado_actual)
+    prediccion_texto = "Mal estado" if accion_predicha == 1 else "Buen estado"
+    print(f"El agente predice: {prediccion_texto}")
+    
+    if accion_predicha == estado_real:
+        print("¡El agente acertó! Reforzando comportamiento positivo...")
+        recompensa = 10
+    else:
+        print("El agente falló. Aplicando penalización...")
+        recompensa = -10
+        
+    agente.aprender(estado_actual, accion_predicha, recompensa, "FIN")
+    print("Conocimiento actualizado y guardado en models/q_table.json")
 
 if __name__ == "__main__":
-    ejecutar_analisis()
+    print("Iniciando entrenamiento del Agente de Detección de Frutas...")
+    
+    ruta_manzana = "datos/imagenes_prueba/manzana.jpg"
+    ruta_platano = "datos/imagenes_prueba/platano.jpg"
+    
+    # Entrenar con la manzana (estado 0 = Buena)
+    if os.path.exists(ruta_manzana):
+        entrenar_agente_con_imagen(ruta_manzana, estado_real=0)
+    else:
+        print(f"Advertencia: No se encontró {ruta_manzana}")
+        
+    # Entrenar con el plátano (estado 1 = Mala)
+    if os.path.exists(ruta_platano):
+        entrenar_agente_con_imagen(ruta_platano, estado_real=1)
+    else:
+        print(f"Advertencia: No se encontró {ruta_platano}")
