@@ -347,9 +347,9 @@ class AplicacionAlimentos:
 
             componentes = {
             "original": datos["imagen_rgb"],
-            "r": datos["canal_r"],
-            "g": datos["canal_g"],
-            "b": datos["canal_b"],
+            "r": datos["visual_r"],
+            "g": datos["visual_g"],
+            "b": datos["visual_b"],
             "gris": datos["imagen_gris"]
             }
 
