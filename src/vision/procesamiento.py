@@ -77,8 +77,16 @@ def obtener_imagenes_procesamiento(ruta_imagen):
 
     # Extraemos cada canal de color individualmente.
     canal_r = imagen_rgb[:, :, 0]
+    visual_r = np.zeros_like(imagen_rgb)
+    visual_r[:, :, 0] = canal_r
+
     canal_g = imagen_rgb[:, :, 1]
+    visual_g = np.zeros_like(imagen_rgb)
+    visual_g[:, :, 1] = canal_g
+
     canal_b = imagen_rgb[:, :, 2]
+    visual_b = np.zeros_like(imagen_rgb)
+    visual_b[:, :, 2] = canal_b
 
     # Conversión a escala de grises.
     imagen_gris = cv2.cvtColor(imagen_bgr, cv2.COLOR_BGR2GRAY)
@@ -87,6 +95,9 @@ def obtener_imagenes_procesamiento(ruta_imagen):
 
     return {
         "imagen_rgb": imagen_rgb,
+        "visual_r": visual_r,
+        "visual_g": visual_g,
+        "visual_b": visual_b,
         "canal_r": canal_r,
         "canal_g": canal_g,
         "canal_b": canal_b,
