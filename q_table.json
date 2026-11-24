@@ -22,5 +22,13 @@
     "color_apagado_muchas_manchas_textura_lisa": {
         "Buen estado": 2.0,
         "Mal estado": 0.0
+    },
+    "piña::{'tono': 'desconocido', 'manchas': 'desconocido', 'textura': 'desconocida'}": {
+        "Buen estado": 2.0,
+        "Mal estado": 0.0
+    },
+    "zanahoria::color_brillante_sin_manchas_textura_lisa": {
+        "Buen estado": 2.0,
+        "Mal estado": 0.0
     }
 }

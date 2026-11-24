@@ -11,6 +11,7 @@ sys.path.insert(0, str(PROYECTO))
 from src.vision.reconocimiento import ReconocedorAlimentos
 from src.vision.procesamiento import analizar_imagen, obtener_imagenes_procesamiento
 from src.agente.q_learning import AgenteQLearning
+from src.agente.estadisticas_entrenamiento import EstadisticasEntrenamiento
 from src.estimacion.vida_util import estimar_vida_util
 
 RANGOS_REFERENCIA = {
@@ -74,6 +75,7 @@ class AplicacionAlimentos:
 
         self.reconocedor = None
         self.agente = AgenteQLearning()
+        self.estadisticas = EstadisticasEntrenamiento()
 
         self.configurar_estilos()
 
@@ -87,14 +89,19 @@ class AplicacionAlimentos:
         self.notebook.add(self.tab_memoria, text=" 🧠 Cerebro de la IA (Patrones) ")
 
         self.tab_procesamiento = tk.Frame(self.notebook, bg=COLORES["fondo"])
-        self.notebook.add(self.tab_procesamiento,text="  Procesamiento de imagen  ")
+        self.notebook.add(self.tab_procesamiento, text="  Procesamiento de imagen  ")
+
+        self.tab_entrenamiento = tk.Frame(self.notebook, bg=COLORES["fondo"])
+        self.notebook.add(self.tab_entrenamiento, text="  Proceso de Entrenamiento  ")
 
         self.configurar_scroll_analisis()
         self.configurar_scroll_procesamiento()
+        self.configurar_scroll_entrenamiento()
 
         self.crear_interfaz_analisis()
         self.crear_interfaz_memoria()
         self.crear_interfaz_procesamiento()
+        self.crear_interfaz_entrenamiento()
 
         self.ventana.bind_all("<MouseWheel>", self._desplazar_scroll)
         self.imagen_tk = None
@@ -153,6 +160,9 @@ class AplicacionAlimentos:
         elif pestaña_actual == str(self.tab_procesamiento):
             canvas = self.canvas_procesamiento
 
+        elif pestaña_actual == str(self.tab_entrenamiento):
+            canvas = self.canvas_entrenamiento
+
         else:
             return
 
@@ -164,6 +174,158 @@ class AplicacionAlimentos:
         card = tk.Frame(parent, bg=COLORES["tarjeta"], highlightbackground=COLORES["borde"], highlightthickness=1, padx=24, pady=18)
         card.pack(fill="x", padx=45, pady=pady)
         return card
+
+    def configurar_scroll_entrenamiento(self):
+        self.canvas_entrenamiento = tk.Canvas(
+            self.tab_entrenamiento, bg=COLORES["fondo"], highlightthickness=0
+        )
+        scrollbar = ttk.Scrollbar(
+            self.tab_entrenamiento, orient="vertical",
+            command=self.canvas_entrenamiento.yview
+        )
+        self.canvas_entrenamiento.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.canvas_entrenamiento.pack(side="left", fill="both", expand=True)
+        self.contenido_entrenamiento = tk.Frame(
+            self.canvas_entrenamiento, bg=COLORES["fondo"]
+        )
+        self.canvas_entrenamiento_window = self.canvas_entrenamiento.create_window(
+            (0, 0), window=self.contenido_entrenamiento, anchor="nw"
+        )
+        self.contenido_entrenamiento.bind(
+            "<Configure>",
+            lambda e: self.canvas_entrenamiento.configure(
+                scrollregion=self.canvas_entrenamiento.bbox("all")
+            )
+        )
+        self.canvas_entrenamiento.bind(
+            "<Configure>",
+            lambda e: self.canvas_entrenamiento.itemconfig(
+                self.canvas_entrenamiento_window, width=e.width
+            )
+        )
+
+    def crear_interfaz_entrenamiento(self):
+        header = tk.Frame(self.contenido_entrenamiento, bg=COLORES["fondo"])
+        header.pack(fill="x", padx=45, pady=(24, 14))
+        tk.Label(
+            header, text="Proceso de Entrenamiento",
+            font=("Segoe UI", 22, "bold"), fg=COLORES["texto_principal"],
+            bg=COLORES["fondo"]
+        ).pack(anchor="w")
+        tk.Label(
+            header, text="Seguimiento individual del aprendizaje de frutas y verduras.",
+            font=("Segoe UI", 11), fg=COLORES["texto_secundario"],
+            bg=COLORES["fondo"]
+        ).pack(anchor="w", pady=(2, 0))
+
+        self.contenedor_tarjetas_entrenamiento = tk.Frame(
+            self.contenido_entrenamiento, bg=COLORES["fondo"]
+        )
+        self.contenedor_tarjetas_entrenamiento.pack(
+            fill="both", expand=True, padx=10, pady=(8, 25)
+        )
+        self.actualizar_vista_entrenamiento()
+
+    def actualizar_vista_entrenamiento(self):
+        if not hasattr(self, "contenedor_tarjetas_entrenamiento"):
+            return
+
+        for widget in self.contenedor_tarjetas_entrenamiento.winfo_children():
+            widget.destroy()
+
+        registros = self.estadisticas.obtener_registros()
+        if not registros:
+            vacio = tk.Frame(
+                self.contenedor_tarjetas_entrenamiento, bg=COLORES["tarjeta"],
+                highlightbackground=COLORES["borde"], highlightthickness=1,
+                padx=24, pady=28
+            )
+            vacio.pack(fill="x", padx=30, pady=14)
+            tk.Label(
+                vacio, text="Aún no hay alimentos evaluados",
+                font=("Segoe UI", 14, "bold"), fg=COLORES["texto_principal"],
+                bg=COLORES["tarjeta"]
+            ).pack(anchor="w")
+            tk.Label(
+                vacio,
+                text="Analiza una imagen y confirma o corrige el diagnóstico para comenzar a registrar el aprendizaje.",
+                font=("Segoe UI", 10), fg=COLORES["texto_secundario"],
+                bg=COLORES["tarjeta"], wraplength=850, justify="left"
+            ).pack(anchor="w", pady=(6, 0))
+            return
+
+        for registro in registros:
+            intentos = int(registro.get("intentos", 0))
+            correctos = int(registro.get("correctos", 0))
+            fallas = int(registro.get("fallas", 0))
+            corregidos = int(registro.get("corregidos", 0))
+            porcentaje = (correctos / intentos * 100) if intentos else 0.0
+
+            tarjeta = tk.Frame(
+                self.contenedor_tarjetas_entrenamiento, bg=COLORES["tarjeta"],
+                highlightbackground=COLORES["borde"], highlightthickness=1,
+                padx=24, pady=20
+            )
+            tarjeta.pack(fill="x", padx=30, pady=10)
+
+            encabezado = tk.Frame(tarjeta, bg=COLORES["tarjeta"])
+            encabezado.pack(fill="x", pady=(0, 12))
+            tk.Label(
+                encabezado, text=registro.get("alimento", "Desconocido").upper(),
+                font=("Segoe UI", 19, "bold"), fg=COLORES["texto_principal"],
+                bg=COLORES["tarjeta"]
+            ).pack(side="left")
+
+            nombre = registro.get("alimento", "").casefold()
+            tipo = "VERDURA" if nombre in {
+                "zanahoria", "tomate", "cebolla", "espinaca", "apio",
+                "perejil", "lechuga", "papa", "pepino", "brócoli",
+                "pimiento", "calabacín"
+            } else "FRUTA"
+            color_tipo = "#DCFCE7" if tipo == "VERDURA" else "#DBEAFE"
+            texto_tipo = "#166534" if tipo == "VERDURA" else "#1D4ED8"
+            tk.Label(
+                encabezado, text=f" {tipo} ", font=("Segoe UI", 9, "bold"),
+                fg=texto_tipo, bg=color_tipo, padx=12, pady=6
+            ).pack(side="left", padx=(14, 0))
+
+            metricas = tk.Frame(tarjeta, bg=COLORES["tarjeta"])
+            metricas.pack(fill="x")
+            for columna in range(4):
+                metricas.columnconfigure(columna, weight=1)
+
+            valores = [
+                ("Intentos", intentos, COLORES["texto_principal"]),
+                ("Correctos", correctos, COLORES["exito_fg"]),
+                ("Fallas", fallas, "#DC2626"),
+                ("Corregidos", corregidos, COLORES["primario"])
+            ]
+            for columna, (etiqueta, valor, color) in enumerate(valores):
+                bloque = tk.Frame(metricas, bg=COLORES["tarjeta"])
+                bloque.grid(row=0, column=columna, sticky="nsew", padx=5)
+                tk.Label(
+                    bloque, text=etiqueta, font=("Segoe UI", 10),
+                    fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"]
+                ).pack()
+                tk.Label(
+                    bloque, text=str(valor), font=("Segoe UI", 22, "bold"),
+                    fg=color, bg=COLORES["tarjeta"]
+                ).pack()
+
+            pie = tk.Frame(tarjeta, bg=COLORES["tarjeta"])
+            pie.pack(fill="x", pady=(14, 0))
+            tk.Label(
+                pie, text=f"Aprendizaje: {porcentaje:.0f}%",
+                font=("Segoe UI", 12, "bold"), fg=COLORES["texto_principal"],
+                bg=COLORES["tarjeta"]
+            ).pack(anchor="w")
+            barra_fondo = tk.Frame(pie, bg="#E2E8F0", height=13)
+            barra_fondo.pack(fill="x", pady=(7, 0))
+            barra_fondo.pack_propagate(False)
+            ancho = max(0, min(100, porcentaje))
+            barra = tk.Frame(barra_fondo, bg=COLORES["primario"], height=13)
+            barra.place(relx=0, rely=0, relwidth=ancho / 100, relheight=1)
 
     def crear_interfaz_analisis(self):
         header = tk.Frame(self.contenido_frame, bg=COLORES["fondo"])
@@ -532,7 +694,12 @@ class AplicacionAlimentos:
 
     def confirmar_diagnostico(self):
         if self.feedback_registrado: return
-        self.agente.registrar_feedback(self.estado_actual, self.diagnostico_actual, correcto=True)
+        self.agente.registrar_feedback(
+            self.estado_actual, self.diagnostico_actual, correcto=True,
+            alimento_contexto=self.alimento_ia_original
+        )
+        self.estadisticas.registrar(self.alimento_var.get(), correcto=True)
+        self.actualizar_vista_entrenamiento()
         self.finalizar_feedback("✓ Aprendizaje validado y guardado en JSON.")
 
     def mostrar_correccion(self):
@@ -561,9 +728,12 @@ class AplicacionAlimentos:
             correcto=False,
             estado_real=estado_real,
             alimento_ia=self.alimento_ia_original,
-            alimento_real=fruta_real
+            alimento_real=fruta_real,
+            alimento_contexto=self.alimento_ia_original
         )
 
+        self.estadisticas.registrar(fruta_real, correcto=False)
+        self.actualizar_vista_entrenamiento()
         self.alimento_var.set(fruta_real)
         self.diagnostico_var.set(estado_real)
         self.actualizar_vida_util(fruta_real, estado_real)
