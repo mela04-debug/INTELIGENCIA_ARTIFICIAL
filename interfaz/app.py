@@ -1,4 +1,7 @@
 import sys
+import hashlib
+import shutil
+import re
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -13,6 +16,8 @@ from src.vision.procesamiento import analizar_imagen, obtener_imagenes_procesami
 from src.agente.q_learning import AgenteQLearning
 from src.agente.estadisticas_entrenamiento import EstadisticasEntrenamiento
 from src.estimacion.vida_util import estimar_vida_util
+from src.almacenamiento.memoria_agente import MemoriaAgente
+from src.entrenamiento.gestor_entrenamiento import GestorEntrenamiento
 
 RANGOS_REFERENCIA = {
     "manzana": (7, 14),
@@ -65,6 +70,7 @@ class AplicacionAlimentos:
         self.diagnostico_actual = None
         self.alimento_ia_original = None
         self.feedback_registrado = False
+        self.embedding_actual = None
 
         # Lista inicial dinámica (irá creciendo con los nombres que tú escribas)
         self.opciones_alimentos = [
@@ -76,6 +82,8 @@ class AplicacionAlimentos:
         self.reconocedor = None
         self.agente = AgenteQLearning()
         self.estadisticas = EstadisticasEntrenamiento()
+        self.memoria_niveles = MemoriaAgente()
+        self.gestor_entrenamiento = GestorEntrenamiento(memoria=self.memoria_niveles, agente_q=self.agente)
 
         self.configurar_estilos()
 
@@ -225,6 +233,11 @@ class AplicacionAlimentos:
         self.contenedor_tarjetas_entrenamiento.pack(
             fill="both", expand=True, padx=10, pady=(8, 25)
         )
+        controles = tk.Frame(self.contenido_entrenamiento, bg=COLORES["fondo"])
+        controles.pack(fill="x", padx=35, pady=(0, 12))
+        tk.Button(controles, text="Reiniciar TODO el aprendizaje", font=("Segoe UI", 9, "bold"),
+                  fg="#FFFFFF", bg="#B91C1C", relief="flat", cursor="hand2", padx=12, pady=7,
+                  command=self.reiniciar_todo_aprendizaje).pack(anchor="center")
         self.actualizar_vista_entrenamiento()
 
     def actualizar_vista_entrenamiento(self):
@@ -246,13 +259,13 @@ class AplicacionAlimentos:
                 vacio, text="Aún no hay alimentos evaluados",
                 font=("Segoe UI", 14, "bold"), fg=COLORES["texto_principal"],
                 bg=COLORES["tarjeta"]
-            ).pack(anchor="w")
+            ).pack(anchor="center")
             tk.Label(
                 vacio,
                 text="Analiza una imagen y confirma o corrige el diagnóstico para comenzar a registrar el aprendizaje.",
                 font=("Segoe UI", 10), fg=COLORES["texto_secundario"],
                 bg=COLORES["tarjeta"], wraplength=850, justify="left"
-            ).pack(anchor="w", pady=(6, 0))
+            ).pack(anchor="center", pady=(6, 0))
             return
 
         for registro in registros:
@@ -261,13 +274,23 @@ class AplicacionAlimentos:
             fallas = int(registro.get("fallas", 0))
             corregidos = int(registro.get("corregidos", 0))
             porcentaje = (correctos / intentos * 100) if intentos else 0.0
+            # El nivel guardado proviene de la evaluación independiente; no del porcentaje de feedback.
+            memorias = self.memoria_niveles.obtener_memorias_visuales(registro.get("alimento", ""))
+            ejemplos = {"Buen estado": 0, "Mal estado": 0}
+            for muestra in memorias:
+                etiqueta = muestra.get("estado")
+                if etiqueta in ejemplos:
+                    ejemplos[etiqueta] += 1
+            niveles_guardados = self.memoria_niveles.obtener_niveles()
+            nivel_registro = next((n for n in niveles_guardados if str(n.get("alimento", "")).casefold() == str(registro.get("alimento", "")).casefold()), None)
+            nivel_actual = nivel_registro.get("nivel", "Básico") if nivel_registro else "Básico"
 
             tarjeta = tk.Frame(
                 self.contenedor_tarjetas_entrenamiento, bg=COLORES["tarjeta"],
                 highlightbackground=COLORES["borde"], highlightthickness=1,
                 padx=24, pady=20
             )
-            tarjeta.pack(fill="x", padx=30, pady=10)
+            tarjeta.pack(fill="x", padx=22, pady=10)
 
             encabezado = tk.Frame(tarjeta, bg=COLORES["tarjeta"])
             encabezado.pack(fill="x", pady=(0, 12))
@@ -275,7 +298,7 @@ class AplicacionAlimentos:
                 encabezado, text=registro.get("alimento", "Desconocido").upper(),
                 font=("Segoe UI", 19, "bold"), fg=COLORES["texto_principal"],
                 bg=COLORES["tarjeta"]
-            ).pack(side="left")
+            ).pack(anchor="center")
 
             nombre = registro.get("alimento", "").casefold()
             tipo = "VERDURA" if nombre in {
@@ -288,7 +311,7 @@ class AplicacionAlimentos:
             tk.Label(
                 encabezado, text=f" {tipo} ", font=("Segoe UI", 9, "bold"),
                 fg=texto_tipo, bg=color_tipo, padx=12, pady=6
-            ).pack(side="left", padx=(14, 0))
+            ).pack(anchor="center", pady=(5, 0))
 
             metricas = tk.Frame(tarjeta, bg=COLORES["tarjeta"])
             metricas.pack(fill="x")
@@ -316,16 +339,103 @@ class AplicacionAlimentos:
             pie = tk.Frame(tarjeta, bg=COLORES["tarjeta"])
             pie.pack(fill="x", pady=(14, 0))
             tk.Label(
-                pie, text=f"Aprendizaje: {porcentaje:.0f}%",
+                pie, text=f"NIVEL DE APRENDIZAJE: {nivel_actual.upper()}",
                 font=("Segoe UI", 12, "bold"), fg=COLORES["texto_principal"],
                 bg=COLORES["tarjeta"]
-            ).pack(anchor="w")
-            barra_fondo = tk.Frame(pie, bg="#E2E8F0", height=13)
-            barra_fondo.pack(fill="x", pady=(7, 0))
-            barra_fondo.pack_propagate(False)
-            ancho = max(0, min(100, porcentaje))
-            barra = tk.Frame(barra_fondo, bg=COLORES["primario"], height=13)
-            barra.place(relx=0, rely=0, relwidth=ancho / 100, relheight=1)
+            ).pack(anchor="center", pady=(0, 8))
+
+            colores_nivel = {"Básico": "#64748B", "Intermedio": "#D97706", "Avanzado": "#16A34A"}
+            fila_niveles = tk.Frame(pie, bg=COLORES["tarjeta"])
+            fila_niveles.pack(anchor="center")
+            for etiqueta_nivel in ("Básico", "Intermedio", "Avanzado"):
+                activo = etiqueta_nivel == nivel_actual
+                fondo_nivel = colores_nivel[etiqueta_nivel] if activo else "#E2E8F0"
+                texto_nivel = "#FFFFFF" if activo else COLORES["texto_secundario"]
+                tk.Label(
+                    fila_niveles, text=etiqueta_nivel, font=("Segoe UI", 10, "bold"),
+                    fg=texto_nivel, bg=fondo_nivel, padx=14, pady=7
+                ).pack(side="left", padx=(0, 8))
+            tk.Label(
+                pie, text=f"Ejemplos guardados: {ejemplos['Buen estado']} Buen estado · {ejemplos['Mal estado']} Mal estado",
+                font=("Segoe UI", 9), fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"]
+            ).pack(anchor="center", pady=(8, 0))
+            tk.Label(
+                pie, text="El nivel se actualiza automáticamente cuando hay imágenes de evaluación de ambas clases.",
+                font=("Segoe UI", 9), fg=COLORES["texto_secundario"], bg=COLORES["tarjeta"]
+            ).pack(anchor="center", pady=(6, 0))
+            acciones_refuerzo = tk.Frame(pie, bg=COLORES["tarjeta"])
+            acciones_refuerzo.pack(anchor="center", pady=(8, 0))
+            tk.Button(acciones_refuerzo, text="＋ Reforzar: Buen estado", font=("Segoe UI", 9, "bold"),
+                      fg="#166534", bg="#DCFCE7", relief="flat", cursor="hand2", padx=10, pady=6,
+                      command=lambda a=registro.get("alimento", ""): self.reforzar_desde_imagenes(a, "Buen estado")).pack(side="left", padx=4)
+            tk.Button(acciones_refuerzo, text="＋ Reforzar: Mal estado", font=("Segoe UI", 9, "bold"),
+                      fg="#991B1B", bg="#FEE2E2", relief="flat", cursor="hand2", padx=10, pady=6,
+                      command=lambda a=registro.get("alimento", ""): self.reforzar_desde_imagenes(a, "Mal estado")).pack(side="left", padx=4)
+            tk.Button(acciones_refuerzo, text="Reiniciar alimento", font=("Segoe UI", 9),
+                      fg="#FFFFFF", bg="#B91C1C", relief="flat", cursor="hand2", padx=10, pady=6,
+                      command=lambda a=registro.get("alimento", ""): self.reiniciar_aprendizaje_alimento(a)).pack(side="left", padx=4)
+
+    def reforzar_desde_imagenes(self, alimento, etiqueta):
+        if self.reconocedor is None:
+            messagebox.showwarning("Modelo no listo", "Espera a que el modelo neuronal termine de cargar.")
+            return
+        rutas = filedialog.askopenfilenames(title=f"Selecciona imágenes de {alimento} · {etiqueta}",
+            filetypes=[("Imágenes", "*.jpg *.jpeg *.png *.webp *.bmp"), ("Todos", "*.*")])
+        if not rutas: return
+        if not messagebox.askyesno("Confirmar refuerzo", f"Se guardarán {len(rutas)} imagen(es) de {alimento} como '{etiqueta}'.\n\n¿Continuar?"):
+            return
+        guardadas = 0
+        errores = []
+        for ruta in rutas:
+            try:
+                imagen_aprendizaje = self.guardar_imagen_aprendizaje(alimento, etiqueta, ruta)
+                embedding = self.reconocedor.extraer_caracteristicas(imagen_aprendizaje)
+                self.gestor_entrenamiento.visual.registrar_ejemplo(alimento, etiqueta, embedding, imagen=imagen_aprendizaje)
+                guardadas += 1
+            except Exception as e:
+                errores.append(f"{Path(ruta).name}: {e}")
+        self.actualizar_vista_entrenamiento()
+        mensaje = f"Guardadas {guardadas} imagen(es) de {alimento} · {etiqueta}."
+        if errores: mensaje += "\n\nErrores:\n" + "\n".join(errores[:5])
+        messagebox.showinfo("Refuerzo de aprendizaje", mensaje)
+
+    def reiniciar_aprendizaje_alimento(self, alimento):
+        if not messagebox.askyesno("Confirmar reinicio", f"Se eliminará el aprendizaje registrado para {alimento} (memoria visual, Q, experiencias, nivel y estadísticas).\n\nEsta acción no se puede deshacer. ¿Continuar?"):
+            return
+        self._borrar_datos_aprendizaje(alimento)
+        self.actualizar_vista_entrenamiento()
+        messagebox.showinfo("Reinicio", f"Se reinició el aprendizaje de {alimento}.")
+
+    def reiniciar_todo_aprendizaje(self):
+        if not messagebox.askyesno("Reiniciar todo", "Se eliminará el aprendizaje registrado de TODOS los alimentos.\n\nSe recomienda hacer copia de seguridad. ¿Continuar?"):
+            return
+        self._borrar_datos_aprendizaje(None)
+        self.actualizar_vista_entrenamiento()
+        messagebox.showinfo("Reinicio", "Se reinició el aprendizaje de todos los alimentos.")
+
+    def _borrar_datos_aprendizaje(self, alimento=None):
+        memoria = self.memoria_niveles
+        with memoria.conectar() as con:
+            tablas = ("experiencias", "memoria_visual", "valores_q", "estadisticas", "niveles")
+            for tabla in tablas:
+                if alimento:
+                    con.execute(f"DELETE FROM {tabla} WHERE LOWER(alimento)=LOWER(?)", (alimento,))
+                else:
+                    con.execute(f"DELETE FROM {tabla}")
+        # El JSON de estadísticas de interfaz también se limpia, para que no queden métricas desfasadas.
+        claves = [k for k,v in self.estadisticas.datos.items() if not alimento or str(v.get("alimento", k)).casefold()==alimento.casefold()]
+        for clave in claves: self.estadisticas.datos.pop(clave, None)
+        self.estadisticas.guardar()
+        # Q-table JSON legado, si existiera, se limpia sin eliminar el archivo.
+        for qpath in (PROYECTO / "q_table.json", PROYECTO / "models" / "q_table.json"):
+            if qpath.exists():
+                try:
+                    import json
+                    with qpath.open("r", encoding="utf-8") as f: qdata=json.load(f)
+                    if alimento and isinstance(qdata, dict): qdata.pop(alimento, None); qdata.pop(alimento.casefold(), None)
+                    elif not alimento: qdata={}
+                    with qpath.open("w", encoding="utf-8") as f: json.dump(qdata, f, indent=2, ensure_ascii=False)
+                except Exception: pass
 
     def crear_interfaz_analisis(self):
         header = tk.Frame(self.contenido_frame, bg=COLORES["fondo"])
@@ -590,6 +700,7 @@ class AplicacionAlimentos:
         self.diagnostico_actual = None
         self.alimento_ia_original = None
         self.feedback_registrado = False
+        self.embedding_actual = None
         self.alimento_var.set("--")
         self.confianza_var.set("--")
         self.diagnostico_var.set("--")
@@ -652,9 +763,19 @@ class AplicacionAlimentos:
             self.alimento_ia_original = alimento_raw
 
             caracteristicas = analizar_imagen(str(self.ruta_imagen))
+            self.embedding_actual = self.reconocedor.extraer_caracteristicas(str(self.ruta_imagen))
 
-            # El agente devuelve el estado sanitario y el nombre (corregido si ya lo aprendió antes)
-            estado, diagnostico, alimento_aprendido = self.agente.predecir(caracteristicas, alimento_raw)
+            # La memoria visual busca ejemplos previamente confirmados. Q-Learning
+            # sirve como respaldo si no hay coincidencia visual suficiente.
+            pred_visual = self.gestor_entrenamiento.visual.predecir(
+                alimento_raw, self.embedding_actual
+            )
+            estado, diagnostico, alimento_aprendido = self.agente.predecir(
+                caracteristicas, alimento_raw
+            )
+            if pred_visual.get("estado") in ("Buen estado", "Mal estado"):
+                diagnostico = pred_visual["estado"]
+                estado = caracteristicas
 
             self.estado_actual = estado
             self.diagnostico_actual = diagnostico
@@ -692,15 +813,38 @@ class AplicacionAlimentos:
         except Exception as error:
             messagebox.showerror("Error", str(error))
 
+    def guardar_imagen_aprendizaje(self, alimento, etiqueta, ruta_origen):
+        """Copia la imagen confirmada a datos/aprendizaje y evita duplicados por hash."""
+        estados = {"Buen estado": "buen_estado", "Mal estado": "mal_estado"}
+        if etiqueta not in estados:
+            raise ValueError("Etiqueta de aprendizaje inválida.")
+        nombre_alimento = re.sub(r"[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ_-]+", "_", str(alimento).strip().lower()).strip("_")
+        carpeta = PROYECTO / "datos" / "aprendizaje" / nombre_alimento / estados[etiqueta]
+        carpeta.mkdir(parents=True, exist_ok=True)
+        origen = Path(ruta_origen)
+        digest = hashlib.sha256(origen.read_bytes()).hexdigest()
+        destino = carpeta / f"{digest[:20]}{origen.suffix.lower()}"
+        if not destino.exists():
+            shutil.copy2(origen, destino)
+        return str(destino)
+
     def confirmar_diagnostico(self):
         if self.feedback_registrado: return
-        self.agente.registrar_feedback(
-            self.estado_actual, self.diagnostico_actual, correcto=True,
-            alimento_contexto=self.alimento_ia_original
-        )
-        self.estadisticas.registrar(self.alimento_var.get(), correcto=True)
-        self.actualizar_vista_entrenamiento()
-        self.finalizar_feedback("✓ Aprendizaje validado y guardado en JSON.")
+        try:
+            if not self.ruta_imagen or not self.reconocedor:
+                raise RuntimeError("No hay imagen/modelo disponible para guardar aprendizaje visual.")
+            embedding = self.embedding_actual or self.reconocedor.extraer_caracteristicas(str(self.ruta_imagen))
+            alimento = self.alimento_var.get().strip()
+            imagen_aprendizaje = self.guardar_imagen_aprendizaje(alimento, self.diagnostico_actual, self.ruta_imagen)
+            self.gestor_entrenamiento.registrar_confirmacion(
+                alimento, self.diagnostico_actual, embedding, imagen=imagen_aprendizaje,
+                estado_visual=self.estado_actual, prediccion=self.diagnostico_actual
+            )
+            self.estadisticas.registrar(alimento, correcto=True)
+            self.actualizar_vista_entrenamiento()
+            self.finalizar_feedback("✓ Confirmación guardada en memoria visual y SQLite.")
+        except Exception as error:
+            messagebox.showerror("No se pudo guardar", str(error))
 
     def mostrar_correccion(self):
         if self.feedback_registrado: return
@@ -721,16 +865,19 @@ class AplicacionAlimentos:
             self.opciones_alimentos.append(fruta_real)
             self.lista_frutas['values'] = self.opciones_alimentos
 
-        # Enviamos tanto el estado como el nombre nuevo al agente Q-Learning
-        self.agente.registrar_feedback(
-            self.estado_actual,
-            self.diagnostico_actual,
-            correcto=False,
-            estado_real=estado_real,
-            alimento_ia=self.alimento_ia_original,
-            alimento_real=fruta_real,
-            alimento_contexto=self.alimento_ia_original
-        )
+        # Extrae el embedding y registra correccion, experiencia Q y memoria visual en SQLite.
+        try:
+            if not self.ruta_imagen or not self.reconocedor:
+                raise RuntimeError("No hay imagen/modelo disponible para guardar aprendizaje visual.")
+            embedding = self.embedding_actual or self.reconocedor.extraer_caracteristicas(str(self.ruta_imagen))
+            imagen_aprendizaje = self.guardar_imagen_aprendizaje(fruta_real, estado_real, self.ruta_imagen)
+            self.gestor_entrenamiento.registrar_confirmacion(
+                fruta_real, estado_real, embedding, imagen=imagen_aprendizaje,
+                estado_visual=self.estado_actual, prediccion=self.diagnostico_actual
+            )
+        except Exception as error:
+            messagebox.showerror("No se pudo guardar", str(error))
+            return
 
         self.estadisticas.registrar(fruta_real, correcto=False)
         self.actualizar_vista_entrenamiento()

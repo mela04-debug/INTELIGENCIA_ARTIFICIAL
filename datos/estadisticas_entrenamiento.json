@@ -1,16 +1,9 @@
 {
-    "piña": {
-        "alimento": "Piña",
-        "intentos": 1,
-        "correctos": 1,
-        "fallas": 0,
-        "corregidos": 0
-    },
     "zanahoria": {
         "alimento": "Zanahoria",
-        "intentos": 1,
-        "correctos": 1,
-        "fallas": 0,
-        "corregidos": 0
+        "intentos": 18,
+        "correctos": 15,
+        "fallas": 3,
+        "corregidos": 3
     }
 }

@@ -1,9 +1,9 @@
+
 import torch
 import timm
 
 from pathlib import Path
 from PIL import Image
-from timm.data import resolve_data_config, create_transform
 
 
 class ReconocedorAlimentos:
@@ -53,19 +53,18 @@ class ReconocedorAlimentos:
 
         self.modelo.eval()
 
-        configuracion = resolve_data_config(
+        configuracion = timm.data.resolve_data_config(
             self.modelo.pretrained_cfg,
             model=self.modelo
         )
 
-        self.transformar = create_transform(**configuracion)
+        self.transformar = timm.data.create_transform(
+            **configuracion
+        )
 
-        etiquetas = self.modelo.pretrained_cfg["label_names"]
-        self.etiquetas = etiquetas
+        self.etiquetas = self.modelo.pretrained_cfg["label_names"]
 
-    # SE REDUJO EL UMBRAL A 0.0 PARA FINES 100% DIDÁCTICOS (NUNCA BLOQUEA IMÁGENES)
     def reconocer(self, ruta_imagen, umbral=0.0):
-
         ruta = Path(ruta_imagen)
 
         if not ruta.exists():
@@ -89,8 +88,6 @@ class ReconocedorAlimentos:
             etiqueta = self.etiquetas[indice.item()]
             confianza = float(confianza.item())
 
-            # Con umbral=0.0, esta condición de bloqueo jamás se activará.
-            # Siempre pasará al return de éxito abajo.
             if confianza < umbral:
                 return {
                     "identificado": False,
@@ -107,13 +104,52 @@ class ReconocedorAlimentos:
                 "categoria": etiqueta,
                 "confianza": confianza
             }
-            
+
         except Exception as e:
             print(f"Error procesando la imagen: {e}")
-            # Retorno de seguridad por si ocurre un error grave al leer la foto
+
             return {
-                "identificado": True, 
+                "identificado": False,
                 "alimento": "Desconocido",
                 "categoria": "unknown",
                 "confianza": 0.0
             }
+
+    def extraer_caracteristicas(self, ruta_imagen):
+        """
+        Extrae el embedding visual de MobileNetV3.
+
+        Devuelve una lista de números que puede guardarse
+        en SQLite mediante AprendizajeVisual.
+        """
+
+        ruta = Path(ruta_imagen)
+
+        if not ruta.exists():
+            raise FileNotFoundError(
+                f"No se encontró la imagen: {ruta}"
+            )
+
+        imagen = Image.open(ruta).convert("RGB")
+        imagen_tensor = self.transformar(imagen).unsqueeze(0)
+
+        with torch.inference_mode():
+
+            # Extraemos los mapas de características de la red.
+            caracteristicas = self.modelo.forward_features(
+                imagen_tensor
+            )
+
+            # Aplicamos el pooling y obtenemos el vector
+            # anterior a la capa final de clasificación.
+            embedding = self.modelo.forward_head(
+                caracteristicas,
+                pre_logits=True
+            )
+
+            embedding = embedding.flatten(start_dim=1)
+
+        # Convertimos el tensor a una lista compatible con JSON/SQLite.
+        vector = embedding[0].cpu().numpy().astype("float32")
+
+        return vector.tolist()
